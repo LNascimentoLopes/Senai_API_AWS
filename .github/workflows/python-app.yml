@@ -1,17 +1,20 @@
-
 name: Python application
 
 on:
   push:
-    branches: [ "main" ]
+    # O pipeline deve rodar no push para develop e main
+    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
+
+# Uso de variáveis globais para evitar repetição
+env:
+  IMAGE_NAME: minha-api-fastapi
 
 jobs:
   BUILD:
     name: Compilar Projeto
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.10
@@ -29,3 +32,44 @@ jobs:
     - name: Test do app
       run: |
         PYTHONPATH=. pytest test/ -v --tb=short
+
+  BUILD_IMAGE:
+    name: Criar Imagem Docker
+    needs: BUILD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simular Build da Imagem
+        # Referenciando a variável global IMAGE_NAME
+        run: echo "Simulando a criação da imagem docker ${{ env.IMAGE_NAME }}..."
+
+  DEPLOY_HOMOLOGACAO:
+    name: Deploy Homologação
+    needs: BUILD_IMAGE
+    # Condição para rodar o deploy automático apenas na branch develop
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Automático
+        run: |
+          echo "Iniciando deploy automático em Homologação..."
+          echo "Simulando deploy da imagem ${{ env.IMAGE_NAME }} na porta 8080!"
+
+  DEPLOY_PRODUCAO:
+    name: Deploy Produção
+    needs: BUILD_IMAGE
+    # Condição para garantir que produção só é ativada em push para a branch main
+    if: github.ref == 'refs/heads/main'
+    # Exige aprovação manual configurada no GitHub Environment
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Controlado
+        env:
+          # Uso dos secrets de produção
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          echo "Aprovação concedida no ambiente 'production'."
+          echo "Simulando conexão SSH com o servidor $EC2_HOST usando o usuário $EC2_USERNAME..."
+          echo "Deploy controlado da imagem ${{ env.IMAGE_NAME }} realizado com sucesso em Produção!"
